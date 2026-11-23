@@ -16,7 +16,7 @@ Passes never overlap (a lock file makes a second one skip itself). History older
 ## 1. Try one pass by hand
 
 ```bash
-cd /home/maff/Documents/sandbox-fedora-optimize/homemap
+cd ~/Documents/amenhotep-home-network-mapper
 .venv/bin/amenhotep watch
 ```
 
@@ -27,7 +27,7 @@ You should see `watch #N done: X online, Y new, Z fingerprinted`. Add `--notify`
 Install (every 20 minutes; the minimum is 5):
 
 ```bash
-cd /home/maff/Documents/sandbox-fedora-optimize/homemap && assets/install-timer.sh 20
+cd ~/Documents/amenhotep-home-network-mapper && assets/install-timer.sh 20
 ```
 
 This writes `amenhotep-watch.service` and `amenhotep-watch.timer` into `~/.config/systemd/user/`, then enables and starts the timer. It runs as you, not as root, and the first pass starts two minutes after boot or login.
@@ -49,7 +49,7 @@ Change the interval by running the install command again with another number of 
 Remove it:
 
 ```bash
-cd /home/maff/Documents/sandbox-fedora-optimize/homemap && assets/install-timer.sh --remove
+cd ~/Documents/amenhotep-home-network-mapper && assets/install-timer.sh --remove
 ```
 
 Pause it without removing:
