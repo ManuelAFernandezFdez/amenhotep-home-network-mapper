@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 256" width="760" height="256" role="img" aria-label="Amenhotep">
+  <title>Amenhotep</title>
+  <rect width="760" height="256" rx="48" fill="#2a2a2a"/>
+  <g transform="translate(8 0)">
+    <path d="M40 92 Q128 40 216 92" fill="none" stroke="#e9b44c" stroke-width="9" stroke-linecap="round"/>
+    <path d="M28 128 Q128 52 228 128 Q128 204 28 128 Z" fill="#0b1426" stroke="#e9b44c" stroke-width="9" stroke-linejoin="round"/>
+    <path d="M150 188 Q168 214 200 216" fill="none" stroke="#e9b44c" stroke-width="9" stroke-linecap="round"/>
+    <circle cx="208" cy="216" r="10" fill="#e9b44c"/>
+    <circle cx="128" cy="128" r="46" fill="#007acc" stroke="#e9b44c" stroke-width="4"/>
+    <g stroke="#0b1426" stroke-width="4" stroke-linecap="round">
+      <line x1="128" y1="128" x2="128" y2="96"/><line x1="128" y1="128" x2="156" y2="112"/>
+      <line x1="128" y1="128" x2="156" y2="144"/><line x1="128" y1="128" x2="128" y2="160"/>
+      <line x1="128" y1="128" x2="100" y2="144"/><line x1="128" y1="128" x2="100" y2="112"/>
+    </g>
+    <g fill="#0b1426">
+      <circle cx="128" cy="94" r="6"/><circle cx="157" cy="111" r="6"/><circle cx="157" cy="145" r="6"/>
+      <circle cx="128" cy="162" r="6"/><circle cx="99" cy="145" r="6"/><circle cx="99" cy="111" r="6"/>
+    </g>
+    <circle cx="128" cy="128" r="12" fill="#e9b44c"/>
+  </g>
+  <text x="262" y="142" font-family="Georgia, 'DejaVu Serif', serif" font-size="82" font-weight="700" fill="#e9b44c" letter-spacing="2">Amenhotep</text>
+  <text x="266" y="184" font-family="'DejaVu Sans', Arial, sans-serif" font-size="22" fill="#f2f2f2" letter-spacing="1.5">Nothing stays hidden from Amun.</text>
+</svg>

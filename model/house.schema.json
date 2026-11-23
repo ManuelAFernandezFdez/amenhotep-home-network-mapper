@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://amenhotep.local/schema/house-1.json",
+  "title": "Amenhotep house model",
+  "type": "object",
+  "required": ["format", "units", "floors"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "format": { "const": "amenhotep-house/1" },
+    "units": { "const": "m" },
+    "name": { "type": "string", "maxLength": 200 },
+    "floors": { "type": "array", "items": { "$ref": "#/$defs/floor" }, "minItems": 1 },
+    "outdoor": { "type": "array", "items": { "$ref": "#/$defs/outdoor" } },
+    "placements": { "type": "array", "items": { "$ref": "#/$defs/placement" } }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[a-z0-9_]{1,48}$" },
+    "point": {
+      "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2
+    },
+    "point3": {
+      "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3
+    },
+    "polygon": {
+      "type": "array", "items": { "$ref": "#/$defs/point" }, "minItems": 3
+    },
+    "opening": {
+      "type": "object",
+      "required": ["type", "edge", "offset", "width", "height"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "enum": ["door", "window"] },
+        "edge": { "type": "integer", "minimum": 0 },
+        "offset": { "type": "number", "minimum": 0 },
+        "width": { "type": "number", "exclusiveMinimum": 0 },
+        "height": { "type": "number", "exclusiveMinimum": 0 },
+        "sill": { "type": "number", "minimum": 0 }
+      }
+    },
+    "room": {
+      "type": "object",
+      "required": ["id", "name", "polygon"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string", "maxLength": 100 },
+        "polygon": { "$ref": "#/$defs/polygon" },
+        "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "openings": { "type": "array", "items": { "$ref": "#/$defs/opening" } }
+      }
+    },
+    "floor": {
+      "type": "object",
+      "required": ["id", "name", "elevation", "height", "rooms"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string", "maxLength": 100 },
+        "elevation": { "type": "number" },
+        "height": { "type": "number", "exclusiveMinimum": 0 },
+        "rooms": { "type": "array", "items": { "$ref": "#/$defs/room" } }
+      }
+    },
+    "outdoor": {
+      "type": "object",
+      "required": ["id", "name", "kind", "polygon"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "name": { "type": "string", "maxLength": 100 },
+        "kind": { "enum": ["garden", "veranda", "terrace", "other"] },
+        "polygon": { "$ref": "#/$defs/polygon" },
+        "elevation": { "type": "number" },
+        "roofed": { "type": "boolean" }
+      }
+    },
+    "placement": {
+      "type": "object",
+      "required": ["device", "position"],
+      "additionalProperties": false,
+      "properties": {
+        "device": { "type": "string", "format": "uuid" },
+        "label": { "type": "string", "maxLength": 100 },
+        "floor": { "$ref": "#/$defs/id" },
+        "outdoor": { "$ref": "#/$defs/id" },
+        "room": { "$ref": "#/$defs/id" },
+        "position": { "$ref": "#/$defs/point3" },
+        "rotation_deg": { "type": "number" },
+        "mount": { "enum": ["wall", "ceiling", "floor", "table"] }
+      },
+      "oneOf": [
+        { "required": ["floor"] },
+        { "required": ["outdoor"] }
+      ]
+    }
+  }
+}

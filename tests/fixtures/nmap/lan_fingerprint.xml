@@ -1,0 +1,110 @@
+<?xml version="1.0"?>
+<!-- Anonymised, hand-trimmed from real nmap 7.92 output shapes (service scan, scripts, OS detection). -->
+<nmaprun scanner="nmap" args="nmap -sV -O" start="1700000000">
+  <!-- printer: unprivileged result, model only visible in service/product + http-server-header -->
+  <host><status state="up"/>
+    <address addr="192.0.2.27" addrtype="ipv4"/>
+    <ports>
+      <port protocol="tcp" portid="80"><state state="open"/>
+        <service name="http" product="HP ENVY 4520 series printer http config" extrainfo="Serial XXXXXXXX" devicetype="printer" method="probed" conf="10"/>
+        <script id="http-title" output="Site doesn't have a title (text/html)."/>
+        <script id="http-server-header" output="HP HTTP Server; HP ENVY 4520 series - F0V63B"/>
+      </port>
+      <port protocol="tcp" portid="443"><state state="open"/>
+        <service name="http" product="HP ENVY 4520 series printer http config" devicetype="printer" tunnel="ssl" method="probed" conf="10"/>
+        <script id="ssl-cert" output="Subject: commonName=HPB121EB/organizationName=HP">
+          <table key="subject"><elem key="commonName">HPB121EB</elem><elem key="organizationName">HP</elem></table>
+          <table key="issuer"><elem key="commonName">HPB121EB</elem></table>
+        </script>
+        <script id="fingerprint-strings" output="not requested, must be ignored"/>
+      </port>
+      <port protocol="tcp" portid="9100"><state state="open"/><service name="jetdirect" method="table" conf="3"/></port>
+    </ports>
+  </host>
+  <!-- Ziggo/ARRIS gateway: no -O, identified by TLS cert + MiniUPnP + lighttpd -->
+  <host><status state="up"/>
+    <address addr="192.0.2.1" addrtype="ipv4"/>
+    <ports>
+      <port protocol="tcp" portid="80"><state state="open"/>
+        <service name="http" product="lighttpd" method="probed" conf="10"/>
+        <script id="http-title" output="400 Bad Request"/>
+      </port>
+      <port protocol="tcp" portid="443"><state state="open"/>
+        <service name="http" product="lighttpd" tunnel="ssl" method="probed" conf="10"/>
+        <script id="ssl-cert" output="Subject: commonName=localhost.localdomain/organizationName=ARRIS Group Inc.">
+          <table key="subject"><elem key="commonName">localhost.localdomain</elem><elem key="organizationName">ARRIS Group Inc.</elem></table>
+        </script>
+      </port>
+      <port protocol="tcp" portid="5000"><state state="open"/>
+        <service name="upnp" product="MiniUPnP" version="1.9" extrainfo="UPnP 1.1" method="probed" conf="10"/>
+      </port>
+    </ports>
+  </host>
+  <!-- Windows PC: SMB + RDP + NetBIOS; hostscript results -->
+  <host><status state="up"/>
+    <address addr="192.0.2.50" addrtype="ipv4"/>
+    <address addr="00:00:5E:00:53:50" addrtype="mac"/>
+    <ports>
+      <port protocol="tcp" portid="445"><state state="open"/>
+        <service name="microsoft-ds" ostype="Windows" method="table" conf="3"/></port>
+      <port protocol="tcp" portid="3389"><state state="open"/>
+        <service name="ms-wbt-server" product="Microsoft Terminal Services" ostype="Windows" method="probed" conf="10">
+          <cpe>cpe:/o:microsoft:windows</cpe></service>
+        <script id="rdp-ntlm-info" output="Target_Name: LAPTOP-AB12CD">
+          <elem key="NetBIOS_Computer_Name">LAPTOP-AB12CD</elem>
+          <elem key="Product_Version">10.0.19041</elem>
+        </script>
+      </port>
+    </ports>
+    <hostscript>
+      <script id="smb-os-discovery" output="OS: Windows 10 Pro 19045">
+        <elem key="os">Windows 10 Pro 19045</elem><elem key="server">LAPTOP-AB12CD</elem><elem key="workgroup">WORKGROUP</elem>
+      </script>
+      <script id="nbstat" output="NetBIOS name: LAPTOP-AB12CD, NetBIOS user: &lt;unknown&gt;"/>
+    </hostscript>
+  </host>
+  <!-- privileged -O results -->
+  <host><status state="up"/>
+    <address addr="192.0.2.60" addrtype="ipv4"/>
+    <ports><port protocol="tcp" portid="22"><state state="open"/>
+      <service name="ssh" product="OpenSSH" version="9.2p1" extrainfo="Debian 2+deb12u3; protocol 2.0" ostype="Linux" method="probed" conf="10">
+        <cpe>cpe:/a:openbsd:openssh:9.2p1</cpe><cpe>cpe:/o:linux:linux_kernel</cpe></service></port></ports>
+    <os>
+      <osmatch name="Linux 5.4 - 5.10" accuracy="97" line="1">
+        <osclass type="general purpose" vendor="Linux" osfamily="Linux" osgen="5.X" accuracy="97"><cpe>cpe:/o:linux:linux_kernel:5</cpe></osclass>
+      </osmatch>
+      <osmatch name="Linux 4.15" accuracy="90" line="2">
+        <osclass type="general purpose" vendor="Linux" osfamily="Linux" osgen="4.X" accuracy="90"/>
+      </osmatch>
+    </os>
+  </host>
+  <host><status state="up"/>
+    <address addr="192.0.2.61" addrtype="ipv4"/>
+    <os>
+      <osmatch name="TP-LINK TL-WR841N WAP (Linux 2.6.36)" accuracy="95" line="3">
+        <osclass type="WAP" vendor="TP-LINK" osfamily="Linux" osgen="2.6.X" accuracy="95"><cpe>cpe:/o:linux:linux_kernel:2.6.36</cpe></osclass>
+      </osmatch>
+    </os>
+  </host>
+  <host><status state="up"/>
+    <address addr="192.0.2.62" addrtype="ipv4"/>
+    <os>
+      <osmatch name="Apple iOS 15.0" accuracy="92" line="4">
+        <osclass type="phone" vendor="Apple" osfamily="iOS" osgen="15.X" accuracy="92"><cpe>cpe:/o:apple:iphone_os:15</cpe></osclass>
+      </osmatch>
+    </os>
+  </host>
+  <!-- low-accuracy guess must not be trusted -->
+  <host><status state="up"/>
+    <address addr="192.0.2.63" addrtype="ipv4"/>
+    <os><osmatch name="Linux 3.2" accuracy="55" line="5">
+      <osclass type="general purpose" vendor="Linux" osfamily="Linux" osgen="3.X" accuracy="55"/></osmatch></os>
+  </host>
+  <!-- iPhone: only lockdownd port open -->
+  <host><status state="up"/>
+    <address addr="192.0.2.70" addrtype="ipv4"/>
+    <address addr="DA:11:22:33:44:70" addrtype="mac"/>
+    <ports><port protocol="tcp" portid="62078"><state state="open"/>
+      <service name="tcpwrapped" method="probed" conf="8"/></port></ports>
+  </host>
+</nmaprun>

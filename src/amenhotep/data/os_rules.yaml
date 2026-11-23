@@ -1,0 +1,185 @@
+# Classification rules. Extend freely; no code change needed.
+#
+# when:  all listed conditions must hold
+#   ports_all / ports_any : open TCP port numbers
+#   hostname_re           : regex on DNS/mDNS hostname (case-insensitive)
+#   vendor_re             : regex on OUI/nmap vendor
+#   mdns_any              : mDNS service types (e.g. _airplay._tcp)
+#   banner_re             : regex on "service product version" of open ports
+#   upnp_re               : regex on UPnP "manufacturer modelName deviceType"
+# set:   fields to assert (os_family, device_type, vendor, model)
+# weight: confidence 0..1 (see DESIGN §3 table)
+
+rules:
+  - id: windows-smb-rdp
+    when: {ports_all: [445, 3389]}
+    set: {os_family: windows, device_type: computer}
+    weight: 0.50
+  - id: windows-smb-msrpc
+    when: {ports_all: [445, 135]}
+    set: {os_family: windows}
+    weight: 0.50
+  - id: windows-hostname
+    when: {hostname_re: "^(desktop|laptop)-[a-z0-9]{5,8}"}
+    set: {os_family: windows, device_type: computer}
+    weight: 0.60
+  - id: android-hostname
+    when: {hostname_re: "^(android-|galaxy|pixel|redmi|oneplus)"}
+    set: {os_family: android, device_type: phone}
+    weight: 0.60
+  - id: mac-hostname
+    when: {hostname_re: "(macbook|imac|mac-?mini|mac-?studio|mac-?pro)"}
+    set: {os_family: macos, device_type: computer, vendor: Apple}
+    weight: 0.60
+  - id: iphone-hostname
+    when: {hostname_re: "iphone"}
+    set: {os_family: ios, device_type: phone}
+    weight: 0.60
+  - id: ipad-hostname
+    when: {hostname_re: "ipad"}
+    set: {os_family: ipados, device_type: tablet}
+    weight: 0.60
+  - id: synology
+    when: {ports_any: [5000, 5001], banner_re: "synology|dsm"}
+    set: {device_type: nas, os_family: linux, vendor: Synology}
+    weight: 0.60
+  - id: printer-ipp-jetdirect
+    when: {ports_any: [631, 9100]}
+    set: {device_type: printer}
+    weight: 0.50
+  - id: printer-mdns
+    when: {mdns_any: [_ipp._tcp, _printer._tcp, _pdl-datastream._tcp]}
+    set: {device_type: printer}
+    weight: 0.70
+  - id: chromecast
+    when: {mdns_any: [_googlecast._tcp]}
+    set: {device_type: media-player, vendor: Google}
+    weight: 0.70
+  - id: airplay-receiver
+    when: {mdns_any: [_airplay._tcp, _raop._tcp]}
+    set: {device_type: media-player}
+    weight: 0.40
+  - id: ssh-linux
+    when: {ports_all: [22], banner_re: "openssh.*(ubuntu|debian|raspbian)"}
+    set: {os_family: linux}
+    weight: 0.55
+  - id: espressif-iot
+    when: {vendor_re: "espressif"}
+    set: {device_type: iot-sensor, os_family: embedded}
+    weight: 0.45
+  - id: philips-hue
+    when: {vendor_re: "philips lighting|signify"}
+    set: {device_type: hub}
+    weight: 0.45
+  - id: raspberry-pi
+    when: {vendor_re: "raspberry pi"}
+    set: {device_type: computer, os_family: linux}
+    weight: 0.45
+  - id: tplink-network
+    when: {vendor_re: "tp-link"}
+    set: {device_type: network-device}
+    weight: 0.40
+  - id: ziggo-compal-network
+    when: {vendor_re: "compal|technicolor|sagemcom|askey|harris|arris|ubee|ziggo"}
+    set: {device_type: network-device}
+    weight: 0.40
+  - id: vm-nic
+    when: {vendor_re: "vmware|qemu|virtualbox|pcs systems"}
+    set: {device_type: computer}
+    weight: 0.40
+  - id: upnp-tv
+    when: {upnp_re: "mediarenderer.*(tv|samsung|lg|sony)|(samsung|lg|sony).*mediarenderer"}
+    set: {device_type: tv}
+    weight: 0.70
+  - id: upnp-router
+    when: {upnp_re: "internetgatewaydevice"}
+    set: {device_type: router}
+    weight: 0.80
+  - id: upnp-printer
+    when: {upnp_re: "printer"}
+    set: {device_type: printer}
+    weight: 0.80
+
+  # ---- added with the nmap fingerprinting rework (web/TLS/service hints work unprivileged) ----
+  - id: ios-lockdownd
+    when: {ports_any: [62078]}
+    set: {os_family: ios, vendor: Apple}
+    weight: 0.75
+  # Weak guess, shown as such in the evidence: an iOS device with no model is usually a phone.
+  # A model name, a hostname with "ipad", or your own edit always outranks or overrides it.
+  - id: ios-probably-phone
+    when: {ports_any: [62078]}
+    set: {device_type: phone}
+    weight: 0.30
+  - id: android-adb
+    when: {ports_any: [5555]}
+    set: {os_family: android}
+    weight: 0.55
+  - id: macos-afp
+    when: {ports_any: [548]}
+    set: {os_family: macos}
+    weight: 0.50
+  - id: cast-port
+    when: {ports_any: [8009, 8008]}
+    set: {device_type: media-player}
+    weight: 0.50
+  - id: rtsp-camera
+    when: {ports_any: [554], banner_re: "rtsp"}
+    set: {device_type: camera}
+    weight: 0.40
+  - id: airplay-ports
+    when: {ports_all: [7000], banner_re: "rtsp"}
+    set: {device_type: media-player}
+    weight: 0.45
+  - id: arris-compal-router
+    when: {web_re: "arris|compal|connect ?box|ziggo"}
+    set: {device_type: router, vendor: ARRIS}
+    weight: 0.65
+  - id: miniupnpd-gateway
+    when: {banner_re: "miniupnpd?"}
+    set: {device_type: network-device}
+    weight: 0.35
+  - id: web-printer
+    when: {web_re: "laserjet|officejet|deskjet|photosmart|envy \\d|printer|brother|canon pixma|epson"}
+    set: {device_type: printer}
+    weight: 0.65
+  - id: web-synology
+    when: {web_re: "synology|diskstation"}
+    set: {device_type: nas, vendor: Synology}
+    weight: 0.70
+  - id: web-qnap
+    when: {web_re: "qnap"}
+    set: {device_type: nas, vendor: QNAP}
+    weight: 0.70
+  - id: web-camera
+    when: {web_re: "hikvision|dahua|reolink|foscam|amcrest|ip camera|webcam"}
+    set: {device_type: camera}
+    weight: 0.65
+  - id: web-homeassistant
+    when: {web_re: "home assistant"}
+    set: {device_type: hub, os_family: linux}
+    weight: 0.70
+  - id: web-pihole
+    when: {web_re: "pi-hole"}
+    set: {device_type: computer, os_family: linux}
+    weight: 0.70
+  - id: web-openwrt
+    when: {web_re: "openwrt|luci"}
+    set: {device_type: router, os_family: linux}
+    weight: 0.70
+  - id: web-unifi
+    when: {web_re: "unifi|ubiquiti"}
+    set: {device_type: access-point, vendor: Ubiquiti}
+    weight: 0.60
+  - id: web-tplink
+    when: {web_re: "tp-link|tplink"}
+    set: {device_type: network-device, vendor: TP-Link}
+    weight: 0.55
+  - id: web-hue
+    when: {web_re: "philips hue|hue bridge"}
+    set: {device_type: hub, vendor: Philips Hue}
+    weight: 0.70
+  - id: web-tv
+    when: {web_re: "samsung.*tv|lg webos|bravia|smart tv"}
+    set: {device_type: tv}
+    weight: 0.60

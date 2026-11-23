@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<nmaprun scanner="nmap" args="nmap -sV 192.0.2.0/24" start="1700000000">
+  <host>
+    <status state="up"/>
+    <address addr="192.0.2.1" addrtype="ipv4"/>
+    <address addr="B8:27:EB:00:00:01" addrtype="mac" vendor="Raspberry Pi Foundation"/>
+    <hostnames><hostname name="pi.lan" type="PTR"/></hostnames>
+    <ports>
+      <port protocol="tcp" portid="22"><state state="open"/><service name="ssh" product="OpenSSH" version="9.2"/></port>
+      <port protocol="tcp" portid="80"><state state="closed"/></port>
+    </ports>
+    <os>
+      <osmatch name="Linux 5.4" accuracy="96">
+        <osclass type="general purpose" vendor="Linux" osfamily="Linux" osgen="5.X" accuracy="96"/>
+      </osmatch>
+    </os>
+  </host>
+  <host>
+    <status state="up"/>
+    <address addr="192.0.2.20" addrtype="ipv4"/>
+    <address addr="DA:11:22:33:44:55" addrtype="mac"/>
+    <hostnames/>
+  </host>
+  <host>
+    <status state="down"/>
+    <address addr="192.0.2.30" addrtype="ipv4"/>
+  </host>
+  <host>
+    <status state="up"/>
+    <address addr="192.0.2.40" addrtype="ipv4"/>
+  </host>
+</nmaprun>

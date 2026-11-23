@@ -1,0 +1,65 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+.eggs/
+build/
+dist/
+pip-wheel-metadata/
+.python-version
+
+# ---- virtual environments ----
+.venv/
+venv/
+env/
+
+# ---- tool caches and reports ----
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+
+# ---- editors and OS ----
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ---- Amenhotep: private data, never commit ----
+# Real network inventory (IPs, MACs, names, rooms) and scan history
+*.db
+*.db-wal
+*.db-shm
+*.db.bak
+*.sqlite
+*.sqlite3
+# User settings and downloaded vendor lists (the app re-downloads them)
+settings.json
+oui.csv
+mam.csv
+oui36.csv
+# Your own house layout; the tracked sample is model/house.example.json
+house.json
+house.json.bak
+# Lock files and local scratch
+*.lock
+scratch/
+# Screenshots of the real device list (they show real names, IPs and MACs)
+assets/screenshot-*.png
+# Exports of your devices
+exports/
+devices*.csv
+devices*.json
+
+# ---- logs ----
+*.log

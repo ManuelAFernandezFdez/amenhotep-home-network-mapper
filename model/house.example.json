@@ -1,0 +1,142 @@
+{
+  "$schema": "./house.schema.json",
+  "format": "amenhotep-house/1",
+  "units": "m",
+  "name": "Example house (replace dimensions with your own)",
+  "floors": [
+    {
+      "id": "ground",
+      "name": "Ground floor",
+      "elevation": 0.0,
+      "height": 2.6,
+      "rooms": [
+        {
+          "id": "kitchen",
+          "name": "Kitchen",
+          "polygon": [[0, 0], [4, 0], [4, 5], [0, 5]],
+          "color": "#f2d49b",
+          "openings": [
+            { "type": "door", "edge": 1, "offset": 3.8, "width": 0.9, "height": 2.1 },
+            { "type": "window", "edge": 3, "offset": 1.5, "width": 1.2, "height": 1.2, "sill": 0.9 }
+          ]
+        },
+        {
+          "id": "living",
+          "name": "Living room",
+          "polygon": [[4, 0], [10, 0], [10, 5], [4, 5]],
+          "color": "#b9d6f2",
+          "openings": [
+            { "type": "door", "edge": 2, "offset": 2.0, "width": 1.6, "height": 2.2 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "first",
+      "name": "First floor",
+      "elevation": 2.8,
+      "height": 2.6,
+      "rooms": [
+        {
+          "id": "main_bedroom",
+          "name": "Main bedroom",
+          "polygon": [[0, 0], [5, 0], [5, 5], [0, 5]],
+          "color": "#d9c2f0"
+        },
+        {
+          "id": "secondary_bedroom",
+          "name": "Secondary bedroom",
+          "polygon": [[5, 0], [8, 0], [8, 3], [5, 3]],
+          "color": "#c2f0d1"
+        },
+        {
+          "id": "third_bedroom",
+          "name": "Third bedroom",
+          "polygon": [[8, 0], [10, 0], [10, 3], [8, 3]],
+          "color": "#f0c2c2"
+        },
+        {
+          "id": "first_hall",
+          "name": "Hall / landing",
+          "polygon": [[5, 3], [10, 3], [10, 5], [5, 5]],
+          "color": "#e6e6e6"
+        }
+      ]
+    },
+    {
+      "id": "second",
+      "name": "Second floor",
+      "elevation": 5.6,
+      "height": 2.4,
+      "rooms": [
+        {
+          "id": "second_floor_bedroom",
+          "name": "Second-floor bedroom",
+          "polygon": [[0, 0], [5, 0], [5, 5], [0, 5]],
+          "color": "#f0e2c2"
+        }
+      ]
+    }
+  ],
+  "outdoor": [
+    {
+      "id": "veranda",
+      "name": "Veranda",
+      "kind": "veranda",
+      "polygon": [[4, -2.5], [10, -2.5], [10, 0], [4, 0]],
+      "elevation": 0.0,
+      "roofed": true
+    },
+    {
+      "id": "garden",
+      "name": "Garden",
+      "kind": "garden",
+      "polygon": [[-3, -10], [13, -10], [13, -2.5], [-3, -2.5]],
+      "elevation": -0.1,
+      "roofed": false
+    }
+  ],
+  "placements": [
+    {
+      "device": "00000000-0000-4000-8000-000000000001",
+      "label": "Mesh repeater - first floor",
+      "floor": "first",
+      "room": "first_hall",
+      "position": [7.5, 4.8, 2.0],
+      "rotation_deg": 0,
+      "mount": "wall"
+    },
+    {
+      "device": "00000000-0000-4000-8000-000000000002",
+      "label": "Mesh repeater - veranda",
+      "outdoor": "veranda",
+      "position": [7.0, -1.0, 2.2],
+      "rotation_deg": 0,
+      "mount": "wall"
+    },
+    {
+      "device": "00000000-0000-4000-8000-000000000003",
+      "label": "Switch SW-1 (ground floor)",
+      "floor": "ground",
+      "room": "living",
+      "position": [9.5, 4.5, 0.4],
+      "mount": "floor"
+    },
+    {
+      "device": "00000000-0000-4000-8000-000000000004",
+      "label": "iPad night clock",
+      "floor": "first",
+      "room": "main_bedroom",
+      "position": [0.6, 1.2, 0.55],
+      "mount": "table"
+    },
+    {
+      "device": "00000000-0000-4000-8000-000000000005",
+      "label": "HomeKit kitchen light",
+      "floor": "ground",
+      "room": "kitchen",
+      "position": [2.0, 2.5, 2.5],
+      "mount": "ceiling"
+    }
+  ]
+}
