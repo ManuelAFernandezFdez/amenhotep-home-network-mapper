@@ -91,6 +91,36 @@ class LinkRow:
 
 
 @dataclass
+class LevelRow:
+    id: str
+    name: str
+    kind: str  # floor | garden | roaming
+    ord: int
+    width: float
+    depth: float
+
+
+@dataclass
+class RoomRect:
+    area_id: int
+    name: str
+    level_id: str | None
+    x: float
+    y: float
+    w: float
+    h: float
+
+
+@dataclass
+class RiserRow:
+    id: int
+    name: str
+    x: float
+    y: float
+    levels: list[str]
+
+
+@dataclass
 class ImportRow:
     id: int
     filename: str
@@ -606,6 +636,127 @@ class Repository:
     def set_medium_by_mac(self, mac: str, medium: str) -> bool:
         cur = self.conn.execute("UPDATE interface SET medium=? WHERE mac=?", (medium, mac))
         return cur.rowcount > 0
+
+    # ---- floor plan ---------------------------------------------------------------
+    def plan_levels(self) -> list[LevelRow]:
+        rows = self.conn.execute("SELECT * FROM plan_level ORDER BY ord DESC").fetchall()
+        return [
+            LevelRow(r["id"], r["name"], r["kind"], r["ord"], r["width"], r["depth"]) for r in rows
+        ]
+
+    def add_plan_level(
+        self, level_id: str, name: str, kind: str, ord_: int, width: float, depth: float
+    ) -> None:
+        self.conn.execute(
+            "INSERT OR IGNORE INTO plan_level(id, name, kind, ord, width, depth) "
+            "VALUES (?,?,?,?,?,?)",
+            (level_id, name, kind, ord_, width, depth),
+        )
+
+    def set_level_size(self, level_id: str, width: float, depth: float) -> None:
+        if not (1 <= width <= 200 and 1 <= depth <= 200):
+            raise ValueError("size must be 1-200 m")
+        self.conn.execute(
+            "UPDATE plan_level SET width=?, depth=? WHERE id=?", (width, depth, level_id)
+        )
+
+    def map_area_to_level(self, area_id: int, level_id: str) -> None:
+        self.conn.execute(
+            "INSERT INTO plan_level_area(area_id, level_id) VALUES (?,?) "
+            "ON CONFLICT(area_id) DO UPDATE SET level_id=excluded.level_id",
+            (area_id, level_id),
+        )
+
+    def plan_level_areas(self) -> dict[int, str]:
+        rows = self.conn.execute("SELECT area_id, level_id FROM plan_level_area").fetchall()
+        return {r["area_id"]: r["level_id"] for r in rows}
+
+    def plan_rooms(self) -> dict[int, RoomRect]:
+        rows = self.conn.execute(
+            "SELECT p.*, a.name FROM plan_room p JOIN area a ON a.id=p.area_id"
+        ).fetchall()
+        return {
+            r["area_id"]: RoomRect(r["area_id"], r["name"], None, r["x"], r["y"], r["w"], r["h"])
+            for r in rows
+        }
+
+    def set_plan_room(self, area_id: int, x: float, y: float, w: float, h: float) -> None:
+        self.conn.execute(
+            "INSERT INTO plan_room(area_id, x, y, w, h) VALUES (?,?,?,?,?) "
+            "ON CONFLICT(area_id) DO UPDATE SET x=excluded.x, y=excluded.y, w=excluded.w, "
+            "h=excluded.h",
+            (area_id, x, y, w, h),
+        )
+
+    def plan_placements(self) -> dict[str, tuple[str, float, float]]:
+        rows = self.conn.execute("SELECT * FROM plan_placement").fetchall()
+        return {r["device_uuid"]: (r["level_id"], r["x"], r["y"]) for r in rows}
+
+    def set_placement(self, device_uuid: str, level_id: str, x: float, y: float) -> None:
+        x, y = min(1.0, max(0.0, x)), min(1.0, max(0.0, y))
+        self.conn.execute(
+            "INSERT INTO plan_placement(device_uuid, level_id, x, y) VALUES (?,?,?,?) "
+            "ON CONFLICT(device_uuid) DO UPDATE SET level_id=excluded.level_id, "
+            "x=excluded.x, y=excluded.y",
+            (device_uuid, level_id, x, y),
+        )
+
+    def clear_placements(self, level_id: str) -> None:
+        self.conn.execute("DELETE FROM plan_placement WHERE level_id=?", (level_id,))
+        self.conn.execute("DELETE FROM plan_matter_placement WHERE level_id=?", (level_id,))
+
+    def plan_matter_placements(self) -> dict[str, tuple[str, float, float]]:
+        rows = self.conn.execute("SELECT * FROM plan_matter_placement").fetchall()
+        return {r["instance"]: (r["level_id"], r["x"], r["y"]) for r in rows}
+
+    def set_matter_placement(self, instance: str, level_id: str, x: float, y: float) -> None:
+        x, y = min(1.0, max(0.0, x)), min(1.0, max(0.0, y))
+        self.conn.execute(
+            "INSERT INTO plan_matter_placement(instance, level_id, x, y) VALUES (?,?,?,?) "
+            "ON CONFLICT(instance) DO UPDATE SET level_id=excluded.level_id, "
+            "x=excluded.x, y=excluded.y",
+            (instance, level_id, x, y),
+        )
+
+    def plan_risers(self) -> list[RiserRow]:
+        rows = self.conn.execute("SELECT * FROM plan_riser ORDER BY id").fetchall()
+        return [RiserRow(r["id"], r["name"], r["x"], r["y"], json.loads(r["levels"])) for r in rows]
+
+    def save_riser(
+        self, riser_id: int | None, name: str, x: float, y: float, levels: list[str]
+    ) -> int:
+        name = name.strip()[:48]
+        if not name:
+            raise ValueError("a passage needs a name")
+        if len(set(levels)) < 2:
+            raise ValueError("a passage connects at least two levels")
+        known = {lv.id for lv in self.plan_levels()}
+        if not set(levels) <= known:
+            raise ValueError("unknown level")
+        x, y = min(1.0, max(0.0, x)), min(1.0, max(0.0, y))
+        data = json.dumps(sorted(set(levels)))
+        if riser_id is None:
+            cur = self.conn.execute(
+                "INSERT INTO plan_riser(name, x, y, levels) VALUES (?,?,?,?)", (name, x, y, data)
+            )
+            return int(cur.lastrowid or 0)
+        self.conn.execute(
+            "UPDATE plan_riser SET name=?, x=?, y=?, levels=? WHERE id=?",
+            (name, x, y, data, riser_id),
+        )
+        return riser_id
+
+    def move_riser(self, riser_id: int, x: float, y: float) -> None:
+        self.conn.execute(
+            "UPDATE plan_riser SET x=?, y=? WHERE id=?",
+            (min(1.0, max(0.0, x)), min(1.0, max(0.0, y)), riser_id),
+        )
+
+    def delete_riser(self, riser_id: int) -> None:
+        self.conn.execute("DELETE FROM plan_riser WHERE id=?", (riser_id,))
+
+    def area_by_name(self, name: str) -> AreaRow | None:
+        return next((a for a in self.list_areas() if a.name.casefold() == name.casefold()), None)
 
     # ---- imports (HomeMapper CSV) -------------------------------------------
     def device_by_serial(self, serial: str) -> str | None:

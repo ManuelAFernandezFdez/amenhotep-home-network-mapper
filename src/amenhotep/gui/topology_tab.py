@@ -25,7 +25,8 @@ from amenhotep.services import topology
 from amenhotep.store.repo import Repository
 
 UUID_ROLE = Qt.ItemDataRole.UserRole
-COLUMNS = ["Device", "Port", "Link", "IP", "Type"]
+COLUMNS = ["Device", "Port", "Link", "IP", "Type", "Area"]
+COL_TYPE, COL_AREA = 4, 5
 
 
 class _Tree(QTreeWidget):
@@ -45,6 +46,7 @@ class TopologyTab(QWidget):
     def __init__(self, repo: Repository, parent: Any = None) -> None:
         super().__init__(parent)
         self.repo = repo
+        self.editable = True
         self.tree = _Tree()
         self.tree.setColumnCount(len(COLUMNS))
         self.tree.setHeaderLabels(COLUMNS)
@@ -54,13 +56,21 @@ class TopologyTab(QWidget):
         self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.tree.customContextMenuRequested.connect(self._menu)
         self.tree.dropped.connect(self.drop_link)
+        self.sort_col: int | None = None  # click a title: ascending, again: descending, again: off
+        self.sort_desc = False
+        header = self.tree.header()
+        header.setSectionsClickable(True)
+        header.setSortIndicatorShown(False)
+        header.setToolTip("Click a title to order by it (again to reverse, a third time to reset)")
+        header.sectionClicked.connect(self.sort_by)
         self.summary = QLabel()
         self.summary.setTextFormat(Qt.TextFormat.PlainText)
-        add4 = QPushButton("Add 4-port switch")
-        add8 = QPushButton("Add 8-port switch")
+        self.add4 = add4 = QPushButton("Add 4-port switch")
+        self.add8 = add8 = QPushButton("Add 8-port switch")
         add4.clicked.connect(partial(self._add_switch, 4))
         add8.clicked.connect(partial(self._add_switch, 8))
         self.hints = QPushButton("Suggest uplinks…")
+        self.hints.setToolTip("Needs editing to be allowed: accepted suggestions are saved")
         self.hints.clicked.connect(self.show_suggestions)
         row = QHBoxLayout()
         row.addWidget(self.summary, 1)
@@ -74,6 +84,61 @@ class TopologyTab(QWidget):
             QLabel("Drag a device onto its switch or access point, or right-click → Set uplink…")
         )
         self.refresh()
+
+    def set_editable(self, editable: bool) -> None:
+        self.editable = editable
+        self.tree.setDragEnabled(editable)
+        self.tree.setAcceptDrops(editable)
+        for b in (self.add4, self.add8, self.hints):
+            b.setEnabled(editable)
+
+    # ---- ordering ---------------------------------------------------------------
+    def sort_by(self, column: int) -> None:
+        if self.sort_col != column:
+            self.sort_col, self.sort_desc = column, False
+        elif not self.sort_desc:
+            self.sort_desc = True
+        else:
+            self.sort_col = None
+        header = self.tree.header()
+        header.setSortIndicatorShown(self.sort_col is not None)
+        if self.sort_col is not None:
+            header.setSortIndicator(
+                column,
+                Qt.SortOrder.DescendingOrder if self.sort_desc else Qt.SortOrder.AscendingOrder,
+            )
+        self.refresh()
+
+    def _value(self, n: topology.Node, column: int) -> Any:
+        d, link = n.device, n.link
+        if column == 0:
+            return n.name.casefold()
+        if column == 1:
+            port = link.port if link else None
+            return int(port) if port and port.isdigit() else port or ""
+        if column == 2:
+            return link.medium if link else ""
+        if column == 3:
+            ip = d.ip or ""
+            return (
+                tuple(int(x) for x in ip.split("."))
+                if ip.count(".") == 3 and ip.replace(".", "").isdigit()
+                else ip
+            )
+        if column == COL_TYPE:
+            return d.device_type.casefold()
+        return d.area_label.casefold()
+
+    def _ordered(self, nodes: list[topology.Node]) -> list[topology.Node]:
+        """Siblings in the chosen order; items with no value always stay at the end."""
+        if self.sort_col is None:
+            return nodes
+        col = self.sort_col
+        full = [n for n in nodes if self._value(n, col) not in ("", ())]
+        empty = [n for n in nodes if self._value(n, col) in ("", ())]
+        full.sort(key=lambda n: (isinstance(self._value(n, col), str), self._value(n, col)),
+                  reverse=self.sort_desc)  # fmt: skip
+        return full + empty
 
     # ---- view ---------------------------------------------------------------
     def refresh(self) -> None:
@@ -94,6 +159,7 @@ class TopologyTab(QWidget):
                     via,
                     n.device.ip or "",
                     n.device.device_type,
+                    n.device.area_label,
                 ]
             )
             item.setData(0, UUID_ROLE, n.device.uuid)
@@ -101,15 +167,15 @@ class TopologyTab(QWidget):
                 parent.addTopLevelItem(item)
             else:
                 parent.addChild(item)
-            for c in n.children:
+            for c in self._ordered(n.children):
                 add(item, c)
 
-        for r in topo.roots:
+        for r in self._ordered(topo.roots):
             add(self.tree, r)
         if topo.unlinked:
             group = QTreeWidgetItem([f"No uplink yet ({len(topo.unlinked)})"])
             self.tree.addTopLevelItem(group)
-            for n in topo.unlinked:
+            for n in self._ordered(topo.unlinked):
                 add(group, n)
         self.tree.expandAll()
         for c in range(len(COLUMNS)):
@@ -128,7 +194,7 @@ class TopologyTab(QWidget):
     def _menu(self, pos: QPoint) -> None:
         item = self.tree.itemAt(pos)
         uid = item.data(0, UUID_ROLE) if item else None
-        if not uid:
+        if not uid or not self.editable:
             return
         menu = QMenu(self)
         menu.addAction("Set uplink…", partial(self._ask_uplink, uid))

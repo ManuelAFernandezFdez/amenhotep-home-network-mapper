@@ -43,6 +43,18 @@ def window(qtbot, tmp_path):
     conn.close()
     w = MainWindow(path)
     qtbot.addWidget(w)
+    w.edit_mode.set(True)  # the app starts read-only; most tests exercise editing
+    return w
+
+
+@pytest.fixture
+def readonly_window(qtbot, tmp_path):
+    path = tmp_path / "ro.db"
+    conn = db.connect(path)
+    seed(Repository(conn))
+    conn.close()
+    w = MainWindow(path)
+    qtbot.addWidget(w)
     return w
 
 
@@ -296,3 +308,182 @@ def test_topology_tab_drop_links_device_to_switch(window):
     assert repo.list_links()[0].port == "2"
     window.topology.refresh()
     assert "1 links" in window.topology.summary.text()
+
+
+def test_house_tab_move_into_room_and_passage(window):
+    tab = window.plan
+    uid = window.repo.list_devices()[0].uuid
+    kitchen = window.repo.area_by_name("Kitchen").id
+    tab.select_level("ground")
+    tab.move_device(uid, 0.1, 0.1, kitchen)
+    dev = next(d for d in window.repo.list_devices() if d.uuid == uid)
+    assert dev.area_id == kitchen
+    assert window.repo.plan_placements()[uid] == ("ground", 0.1, 0.1)
+    window.repo.save_riser(None, "Duct", 0.5, 0.5, ["ground", "first"])
+    tab.select_level("first")
+    assert len(tab.selector.risers) == 1
+    tab.delete_passage(tab.repo.plan_risers()[0].id)
+    assert tab.repo.plan_risers() == []
+
+
+def test_house_tab_drag_a_wall_with_the_mouse(window):
+    from PySide6.QtCore import QEvent, QPointF
+    from PySide6.QtGui import QMouseEvent
+
+    tab = window.plan
+    tab.select_level("ground")
+    v = tab.view
+    vp = v.viewport()
+
+    def ev(kind, pt, btn=Qt.MouseButton.LeftButton, held=Qt.MouseButton.LeftButton):
+        return QMouseEvent(
+            kind,
+            QPointF(pt),
+            QPointF(vp.mapToGlobal(pt)),
+            btn,
+            held,
+            Qt.KeyboardModifier.NoModifier,
+        )
+
+    def at(fx):
+        return v.mapFromScene(QPointF(v._rect.width() * fx, v._rect.height() * 0.3))
+
+    none = Qt.MouseButton.NoButton
+    window.show()
+    from PySide6.QtWidgets import QApplication
+
+    QApplication.sendEvent(vp, ev(QEvent.Type.MouseButtonPress, at(0.5)))
+    QApplication.sendEvent(vp, ev(QEvent.Type.MouseMove, at(0.35)))
+    QApplication.sendEvent(
+        vp, ev(QEvent.Type.MouseButtonRelease, at(0.35), btn=Qt.MouseButton.LeftButton, held=none)
+    )
+    kitchen = window.repo.area_by_name("Kitchen").id
+    assert abs(window.repo.plan_rooms()[kitchen].w - (0.35 - 0.02)) < 0.02
+
+
+def test_topology_has_area_column_and_sorts_by_type_and_area(window):
+    from amenhotep.gui.topology_tab import COL_AREA, COL_TYPE, COLUMNS
+
+    tab = window.topology
+    assert COLUMNS[COL_AREA] == "Area" and COLUMNS[COL_TYPE] == "Type"
+    repo = window.repo
+    devs = repo.list_devices()
+    repo.assign_area([devs[0].uuid], repo.area_by_name("Kitchen").id)
+    repo.assign_area([devs[1].uuid], repo.area_by_name("Living room").id)
+    tab.refresh()
+
+    def column(col):
+        group = tab.tree.topLevelItem(tab.tree.topLevelItemCount() - 1)
+        return [group.child(i).text(col) for i in range(group.childCount())]
+
+    tab.sort_by(COL_AREA)  # ascending
+    asc = column(COL_AREA)
+    filled = [a for a in asc if a]
+    assert filled == sorted(filled) and asc[: len(filled)] == filled  # empty areas last
+    tab.sort_by(COL_AREA)  # descending
+    desc = column(COL_AREA)
+    assert [a for a in desc if a] == sorted(filled, reverse=True) and not desc[0] == ""
+    tab.sort_by(COL_AREA)  # third click: back to the default order
+    assert tab.sort_col is None
+    tab.sort_by(COL_TYPE)
+    types = column(COL_TYPE)
+    assert types == sorted(types)
+
+
+def test_app_starts_read_only_and_the_checkbox_switches_every_tab(readonly_window):
+    w = readonly_window
+    w.devices.select_uuids([w.repo.list_devices()[0].uuid])  # an enabled detail panel to look at
+    assert not w.edit_box.isChecked() and not w.edit_mode.enabled
+    tabs = (w.devices, w.home, w.plan, w.topology, w.scans)
+    assert all(
+        not t.editable if hasattr(t, "editable") else not t.import_btn.isEnabled() for t in tabs
+    )
+    assert not w.devices.detail.save_btn.isEnabled() and w.devices.detail.name.isReadOnly()
+    assert not w.plan.add_btn.isEnabled() and not w.plan.view.editable
+    assert not w.topology.add4.isEnabled() and not w.scans.import_btn.isEnabled()
+    w.edit_box.setChecked(True)
+    assert w.edit_mode.enabled and w.devices.detail.save_btn.isEnabled()
+    assert (
+        w.plan.add_btn.isEnabled()
+        and w.topology.add4.isEnabled()
+        and w.scans.import_btn.isEnabled()
+    )
+    assert w.plan.view.editable and w.plan.info.editable
+    w.edit_box.setChecked(False)
+    assert not w.plan.view.editable and not w.devices.detail.save_btn.isEnabled()
+
+
+def test_read_only_blocks_dragging_in_the_house_view(readonly_window):
+    w = readonly_window
+    w.repo.assign_area([w.repo.list_devices()[0].uuid], w.repo.area_by_name("Kitchen").id)
+    w.repo.commit()
+    w.plan.select_level("ground")
+    markers = [i for i in w.plan.view._scene.items() if hasattr(i, "dev")]
+    assert markers and not any(m.flags() & m.GraphicsItemFlag.ItemIsMovable for m in markers)
+    w.edit_mode.set(True)
+    markers = [i for i in w.plan.view._scene.items() if hasattr(i, "dev")]
+    assert all(m.flags() & m.GraphicsItemFlag.ItemIsMovable for m in markers)
+
+
+def test_house_field_table_lists_fields_and_edits_them(window):
+    from PySide6.QtWidgets import QComboBox
+
+    tab = window.plan
+    repo = window.repo
+    uid = repo.list_devices()[0].uuid
+    tab.selected_uuid = uid
+    tab.select_level("ground")
+    tab._show_info()
+    labels = [tab.info.item(r, 0).text() for r in range(tab.info.rowCount())]
+    assert {"Name", "Type", "Vendor", "Area", "IP", "MAC", "Notes"} <= set(labels)
+    row = labels.index("Name")
+    tab.info.item(row, 1).setText("Edited here")  # edit the value cell
+    from PySide6.QtWidgets import QApplication
+
+    QApplication.processEvents()
+    import time
+
+    time.sleep(0.05)
+    QApplication.processEvents()
+    dev = next(d for d in repo.list_devices() if d.uuid == uid)
+    assert dev.display_name == "Edited here" and "display_name" in dev.locked_fields
+    area_row = [tab.info.item(r, 0).text() for r in range(tab.info.rowCount())].index("Area")
+    combo = tab.info.cellWidget(area_row, 1)
+    assert isinstance(combo, QComboBox)
+    combo.setCurrentIndex(combo.findText("Kitchen · Ground floor"))
+    time.sleep(0.05)
+    QApplication.processEvents()
+    assert next(d for d in repo.list_devices() if d.uuid == uid).area == "Kitchen"
+
+
+def test_house_field_table_is_read_only_when_editing_is_off(readonly_window):
+    tab = readonly_window.plan
+    uid = readonly_window.repo.list_devices()[0].uuid
+    tab.selected_uuid = uid
+    tab._show_info()
+    name_item = tab.info.item(0, 1)
+    assert not (name_item.flags() & Qt.ItemFlag.ItemIsEditable)
+    combo = next(
+        tab.info.cellWidget(r, 1) for r in range(tab.info.rowCount()) if tab.info.cellWidget(r, 1)
+    )
+    assert not combo.isEnabled()
+
+
+def test_wires_follow_a_device_while_it_is_dragged(window):
+    from PySide6.QtCore import QPointF
+
+    tab = window.plan
+    repo = window.repo
+    a, b = repo.list_devices()[0].uuid, repo.list_devices()[1].uuid
+    kitchen = repo.area_by_name("Kitchen").id
+    repo.assign_area([a, b], kitchen)
+    repo.set_link(b, a)
+    tab.select_level("ground")
+    view = tab.view
+    assert len(view._lines) == 1
+    line, _ = view._lines[0]
+    marker = view._markers[b]
+    marker.setPos(QPointF(10, 20))  # as a drag would
+    assert (line.line().x1(), line.line().y1()) == (marker.pos().x(), marker.pos().y())
+    moved_a = view._markers[a].pos()
+    assert (line.line().x2(), line.line().y2()) == (moved_a.x(), moved_a.y())

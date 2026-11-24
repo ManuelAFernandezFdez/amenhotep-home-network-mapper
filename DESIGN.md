@@ -425,3 +425,33 @@ Set uplink…). CLI: `topology`, `add-switch`, `link`, `unlink`, `suggest-links 
 and a word such as Wi-Fi/Ethernet set that interface's medium). Hints are cautious (a Wi-Fi
 client with no other AP known → router) and recorded only as unconfirmed `inferred` links.
 SNMP/LLDP stays out until managed gear exists.
+
+## M7: house plan (flat, per level)
+
+Replaces the planned 3D scene for now. Levels (migration 006): Second floor / Attic, First floor,
+Ground floor, Back garden (also shows Veranda), Front garden and Roaming; each is a rectangle with
+a size in metres, and every position is a 0..1 fraction of it. A level shows the zones mapped to it
+(`plan_level_area`; `amenhotep plan-map-area AREA LEVEL` adds one) and its rooms are rectangles
+(`plan_room`, auto-gridded). A device sits in its room; drag it to place it (`plan_placement`) and
+drop it in another room to change its area.
+
+Wires come from the Topology links. Same level: drawn directly (solid blue = cable, dashed gold =
+Wi-Fi). Between levels a cable needs a **passage** (`plan_riser`: a name, a spot, the levels it goes
+through; "Add passage" then click the plan); the wire runs from each device to the passage. With
+no passage it shows a red "!" and a note. A Wi-Fi link between levels needs none, so a repeater off
+the wire only needs a Wi-Fi uplink. The right-hand selector is a side view of the house with the
+passages drawn as gold bars. Opening the tab seeds the levels once and, on an existing database,
+renames the Garden zone to Back garden and adds Front garden and Mini-office.
+
+Room walls: a wall shared by two rooms (or a row of rooms) can be dragged; the cursor changes over
+it. Every room touching the wall is resized together, no room can get smaller than 8 % of the
+level, and hand-placed devices keep their relative place inside a resized room. Devices and
+passages take priority over a wall under the pointer.
+
+Edit mode: the window has one "Allow editing" checkbox (top right), off at start. While off, every
+tab is read-only: the Devices detail panel and its context menu, Topology links and switches, the
+House plan (no dragging devices, passages or walls, no field editing), Thread/Matter naming and
+the HomeMapper import. Scanning stays available. In the House tab the selected item is a
+Field | Value table; read-only fields (IP, MAC, uplink, status…) are never editable, the rest
+are edited in place (choices as drop-downs, notes with a double-click) and saved like the Devices
+detail panel, which locks the field against scans. Wires follow a device while it is dragged.

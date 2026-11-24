@@ -232,6 +232,10 @@ class ScanTab(QWidget):
     def is_running(self) -> bool:
         return self._thread is not None
 
+    def set_editable(self, editable: bool) -> None:
+        """Importing changes stored information, so it follows the global edit switch."""
+        self.import_btn.setEnabled(editable)
+
     def choose_import(self) -> None:
         start = str(data_dir())
         path, _ = QFileDialog.getOpenFileName(

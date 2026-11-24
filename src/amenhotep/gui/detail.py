@@ -39,6 +39,7 @@ class DeviceDetail(QWidget):
     def __init__(self, parent: Any = None) -> None:
         super().__init__(parent)
         self._device: DeviceRow | None = None
+        self._editable = True
 
         self.title = _plain_label()
         self.ip, self.mac, self.hostname = _plain_label(), _plain_label(), _plain_label()
@@ -109,6 +110,16 @@ class DeviceDetail(QWidget):
         for a in areas:
             self.area.addItem(a.label, a.id)
 
+    def set_editable(self, editable: bool) -> None:
+        self._editable = editable
+        for w in (self.name, self.vendor, self.model):
+            w.setReadOnly(not editable)
+        self.notes.setReadOnly(not editable)
+        for c in (self.area, self.type, self.os, self.mode):
+            c.setEnabled(editable)
+        self.save_btn.setEnabled(editable)
+        self.unlock_btn.setEnabled(editable and bool(self._device and self._device.locked_fields))
+
     def clear(self) -> None:
         self._device = None
         self.setEnabled(False)
@@ -147,7 +158,7 @@ class DeviceDetail(QWidget):
         self.notes.setPlainText(device.notes or "")
         locked = ", ".join(device.locked_fields)
         self.lock_note.setText(f"Edited by you (scans won't change): {locked}" if locked else "")
-        self.unlock_btn.setEnabled(bool(device.locked_fields))
+        self.set_editable(self._editable)
         self.evidence.setRowCount(len(evidence))
         for r, e in enumerate(evidence):
             cells = [e["field"], e["value"], f"{e['confidence']:.2f}", e["source"]]

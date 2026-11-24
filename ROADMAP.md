@@ -11,7 +11,7 @@ Each milestone ends in something runnable. Effort is rough, for one developer pa
 | M4 ✅ | Areas & location | Zones/rooms, bulk assign, roaming vs fixed, phone-as-clock pinning | Scenario S3 works | 1 wk |
 | M5 ✅ | HomeKit & Matter | HAP category mapping, model, paired flag, accessory view, Matter/Thread border router detection | HomeKit accessories match Home app count | 1 wk |
 | M6 ✅ | Topology | Infrastructure devices with switch templates (TP-Link unmanaged 4/8 port), manual links with port slots, drag-to-link topology graph, optional Ziggo router client-list importer (wired/Wi-Fi hint), "suggest uplink" hints; SNMP/LLDP collector kept optional for future managed gear | Switches and both repeaters show children, all linked manually in minutes | 2 wk |
-| M7 | 3D viewer | `house.json` loader/validator, Qt Quick 3D scene, rooms/floors, device markers, floor isolation, camera presets | Example house renders with devices | 2 wk |
+| M7 ✅ | House plan | Flat per-level plan instead of 3D: floors/gardens/roaming as rectangles, rooms, device markers, level selector, wire passages between floors, Wi-Fi-only repeaters (the 3D scene and `house.json` are deferred) | Every level shows its devices and wires | 2 wk |
 | M8 | 3D editor | Drag/place devices, numeric position, room polygon editing, save with backup, glTF export, unplaced-device flow | Scenarios S5, S6 | 2 wk |
 | M9 | Hardening & release | Security checklist, packaging (Flatpak or RPM + pip), docs, acceptance run, lab tests | v1.0 tag | 1–2 wk |
 

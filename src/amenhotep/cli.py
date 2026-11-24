@@ -334,6 +334,40 @@ def cmd_import_router_clients(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_plan(args: argparse.Namespace) -> int:
+    from amenhotep.services import plan
+
+    repo = Repository(db.connect(db_path()))
+    plan.seed(repo)
+    counts = plan.device_counts(repo)
+    levels = repo.plan_levels()
+    for lv in levels:
+        print(f"{lv.name:<22} {lv.width:g} x {lv.depth:g} m  {counts.get(lv.id, 0)} devices")
+    names = {lv.id: lv.name for lv in levels}
+    for r in repo.plan_risers():
+        print(f"passage {r.name}: " + " <-> ".join(names[i] for i in r.levels if i in names))
+    lost = plan.unplaced_devices(repo)
+    if lost:
+        print(f"{len(lost)} devices have no floor (area unassigned or on an unmapped area):")
+        for d in lost[: args.limit]:
+            print(f"  {d.display_name or d.ip or d.uuid[:8]}  [{d.area or 'no area'}]")
+    return 0
+
+
+def cmd_plan_map_area(args: argparse.Namespace) -> int:
+    repo = Repository(db.connect(db_path()))
+    area = repo.area_by_name(args.area)
+    level = next((lv for lv in repo.plan_levels() if lv.id == args.level), None)
+    if not area or not level:
+        ids = ", ".join(lv.id for lv in repo.plan_levels())
+        print(f"error: unknown area or level (levels: {ids})", file=sys.stderr)
+        return 2
+    repo.map_area_to_level(area.id, level.id)
+    repo.commit()
+    print(f"{area.name} now shows on {level.name}")
+    return 0
+
+
 def cmd_update_oui(args: argparse.Namespace) -> int:
     if not args.yes:
         print(
@@ -405,6 +439,13 @@ def build_parser() -> argparse.ArgumentParser:
     rc = sub.add_parser("import-router-clients", help="read wired/Wi-Fi from a router client list")
     rc.add_argument("file")
     rc.set_defaults(fn=cmd_import_router_clients)
+    pl = sub.add_parser("plan", help="show the floor-plan levels, passages and unplaced devices")
+    pl.add_argument("--limit", type=int, default=20)
+    pl.set_defaults(fn=cmd_plan)
+    pm = sub.add_parser("plan-map-area", help="show an area on a level")
+    pm.add_argument("area")
+    pm.add_argument("level")
+    pm.set_defaults(fn=cmd_plan_map_area)
     u = sub.add_parser("update-oui", help="download the full IEEE vendor list")
     u.add_argument("--yes", action="store_true")
     u.set_defaults(fn=cmd_update_oui)

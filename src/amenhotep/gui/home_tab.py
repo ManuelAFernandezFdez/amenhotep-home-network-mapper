@@ -46,6 +46,7 @@ class HomeTab(QWidget):
     def __init__(self, repo: Repository, parent: Any = None) -> None:
         super().__init__(parent)
         self.repo = repo
+        self.editable = True
         self._matter: list[MatterDevice] = []
 
         self.summary = QLabel()
@@ -135,9 +136,12 @@ class HomeTab(QWidget):
         rows = self.matter.selectionModel().selectedRows()
         return self._matter[rows[0].row()] if rows else None
 
+    def set_editable(self, editable: bool) -> None:
+        self.editable = editable
+
     def _matter_menu(self, pos: QPoint) -> None:
         item = self.matter.itemAt(pos)
-        if item is None:
+        if item is None or not self.editable:
             return
         self.matter.selectRow(item.row())
         dev = self._matter[item.row()]

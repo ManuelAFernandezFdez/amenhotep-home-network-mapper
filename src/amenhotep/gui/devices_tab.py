@@ -33,6 +33,7 @@ class DevicesTab(QWidget):
     def __init__(self, repo: Repository, parent: Any = None) -> None:
         super().__init__(parent)
         self.repo = repo
+        self.editable = True
         self.model = DeviceTableModel(self)
         self.proxy = DeviceFilterProxy(self)
         self.proxy.setSourceModel(self.model)
@@ -158,6 +159,10 @@ class DevicesTab(QWidget):
             if len(uuids) > 1:
                 self.detail.title.setText(f"{len(uuids)} devices selected (right-click to edit)")
 
+    def set_editable(self, editable: bool) -> None:
+        self.editable = editable
+        self.detail.set_editable(editable)
+
     # ---- editing -----------------------------------------------------
     def _apply_changes(self, uuid: str, changes: dict[str, Any]) -> None:
         self.apply_to([uuid], changes)
@@ -189,6 +194,12 @@ class DevicesTab(QWidget):
         if not uuids:
             return
         menu = QMenu(self)
+        if not self.editable:
+            menu.addAction("Editing is off (tick “Allow editing” at the top right)").setEnabled(
+                False
+            )
+            menu.exec(self.table.viewport().mapToGlobal(pos))
+            return
         type_menu = menu.addMenu("Set type")
         for t in sorted(DEVICE_TYPES):
             type_menu.addAction(t, partial(self.apply_to, uuids, {"device_type": t}))
