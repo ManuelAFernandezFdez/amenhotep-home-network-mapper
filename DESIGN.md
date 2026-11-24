@@ -412,3 +412,16 @@ border router; re-importing replaces the block. Identity from the Home app is ev
 contradicts the stored vendor *and* model only adds a warning note. Each import is recorded in
 `import_log` (migration 004) and listed on the Scans tab. Unknown Home rooms are added as areas
 without a floor.
+
+## M6: topology
+
+Links live in the `link` table (one uplink per device, optional port, wired/Wi-Fi, `source`,
+`confirmed`). `Repository.set_link` refuses loops, ports outside 1..N and ports already used.
+Switches come from templates (`tp-link-4`, `tp-link-8`, `device.ports`, migration 005) and are
+infrastructure; routers, APs and mesh nodes count as infrastructure by type. The Topology tab
+shows the tree and a "No uplink yet" group; drag a device onto its switch/AP (or right-click →
+Set uplink…). CLI: `topology`, `add-switch`, `link`, `unlink`, `suggest-links [--apply]`,
+`import-router-clients FILE` (any text/CSV copy of the router's client list: lines with a MAC
+and a word such as Wi-Fi/Ethernet set that interface's medium). Hints are cautious (a Wi-Fi
+client with no other AP known → router) and recorded only as unconfirmed `inferred` links.
+SNMP/LLDP stays out until managed gear exists.

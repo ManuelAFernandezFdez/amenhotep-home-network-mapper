@@ -13,6 +13,7 @@ from amenhotep.gui.branding import AboutDialog, HeaderBar, app_icon
 from amenhotep.gui.devices_tab import DevicesTab
 from amenhotep.gui.home_tab import HomeTab
 from amenhotep.gui.scan_tab import ScanTab, ServiceFactory, default_factory
+from amenhotep.gui.topology_tab import TopologyTab
 from amenhotep.services.satisfaction import satisfaction
 from amenhotep.services.scan import ScanResult
 from amenhotep.store import db
@@ -35,6 +36,7 @@ class MainWindow(QMainWindow):
 
         self.devices = DevicesTab(self.repo)
         self.home = HomeTab(self.repo)
+        self.topology = TopologyTab(self.repo)
         self.scans = ScanTab(db_path, self.repo, factory)
         self.scans.scanFinished.connect(self._on_scan_finished)
         self.scans.importFinished.connect(self._on_import_finished)
@@ -43,6 +45,7 @@ class MainWindow(QMainWindow):
         self.tabs = QTabWidget()
         self.tabs.addTab(self.devices, "Devices")
         self.tabs.addTab(self.home, "HomeKit && Matter")
+        self.tabs.addTab(self.topology, "Topology")
         self.tabs.addTab(self.scans, "Scans")
         self.header = HeaderBar()
         central = QWidget()
@@ -63,11 +66,13 @@ class MainWindow(QMainWindow):
 
     def _on_scan_finished(self, _result: ScanResult) -> None:
         self.devices.refresh()
+        self.topology.refresh()
         self.home.refresh()
         self._update_status()
 
     def _on_import_finished(self, _result: object) -> None:
         self.devices.refresh()
+        self.topology.refresh()
         self.home.refresh()
         self._update_status()
 

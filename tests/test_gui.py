@@ -284,3 +284,15 @@ def test_scan_tab_imports_a_file_and_lists_it(window, tmp_path):
     assert result is not None and result.rows == 3
     assert window.scans.imports.item(0, 0).text() == "HomeMapper Devices-9.csv"
     assert window.scans.imports.item(0, 2).text() == "3"
+
+
+def test_topology_tab_drop_links_device_to_switch(window):
+    from amenhotep.services import topology
+
+    repo = window.repo
+    sw = topology.add_switch(repo, "S8", "tp-link-8")
+    dev = repo.list_devices()[0].uuid
+    assert window.topology.drop_link(dev, sw, port="2")
+    assert repo.list_links()[0].port == "2"
+    window.topology.refresh()
+    assert "1 links" in window.topology.summary.text()

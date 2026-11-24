@@ -243,6 +243,97 @@ def cmd_import_homemapper(args: argparse.Namespace) -> int:
     return 0
 
 
+def _dev(repo: Repository, key: str) -> str | None:
+    uid = repo.device_by_ip_or_name(key)
+    if not uid:
+        print(
+            f"error: no unique device matches {key!r} (IP, hostname, name or uuid)", file=sys.stderr
+        )
+    return uid
+
+
+def cmd_topology(_: argparse.Namespace) -> int:
+    from amenhotep.services import topology
+
+    repo = Repository(db.connect(db_path()))
+    print("\n".join(topology.render(topology.build(repo))) or "no devices yet")
+    return 0
+
+
+def cmd_add_switch(args: argparse.Namespace) -> int:
+    from amenhotep.services import topology
+
+    repo = Repository(db.connect(db_path()))
+    up = None
+    if args.uplink:
+        up = _dev(repo, args.uplink)
+        if not up:
+            return 1
+    try:
+        uid = topology.add_switch(repo, args.name, f"tp-link-{args.ports}", up)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    print(f"added {args.name} ({args.ports} ports): {uid}")
+    return 0
+
+
+def cmd_link(args: argparse.Namespace) -> int:
+    repo = Repository(db.connect(db_path()))
+    child, parent = _dev(repo, args.child), _dev(repo, args.parent)
+    if not child or not parent:
+        return 1
+    try:
+        repo.set_link(child, parent, port=args.port, medium=args.medium)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    repo.commit()
+    print("linked")
+    return 0
+
+
+def cmd_unlink(args: argparse.Namespace) -> int:
+    repo = Repository(db.connect(db_path()))
+    child = _dev(repo, args.child)
+    if not child:
+        return 1
+    repo.remove_link(child)
+    repo.commit()
+    print("uplink removed")
+    return 0
+
+
+def cmd_suggest_links(args: argparse.Namespace) -> int:
+    from amenhotep.services import topology
+
+    repo = Repository(db.connect(db_path()))
+    names = {d.uuid: d.display_name or d.ip or d.uuid[:8] for d in repo.list_devices()}
+    found = topology.suggest_uplinks(repo)
+    for s in found:
+        print(f"{names[s.child]} -> {names[s.parent]} ({s.medium}): {s.reason}")
+    if not found:
+        print("no suggestions")
+    elif args.apply:
+        print(f"applied {topology.apply_suggestions(repo, found)} (marked as suggested)")
+    else:
+        print("re-run with --apply to record these as suggested links")
+    return 0
+
+
+def cmd_import_router_clients(args: argparse.Namespace) -> int:
+    from amenhotep.services import topology
+
+    repo = Repository(db.connect(db_path()))
+    try:
+        seen, updated = topology.import_router_clients(repo, Path(args.file).expanduser())
+    except (OSError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    print(f"{seen} lines with a MAC, {updated} known devices updated (wired/Wi-Fi)")
+    return 0
+
+
 def cmd_update_oui(args: argparse.Namespace) -> int:
     if not args.yes:
         print(
@@ -293,6 +384,27 @@ def build_parser() -> argparse.ArgumentParser:
     im = sub.add_parser("import-homemapper", help="merge a HomeMapper (iPhone) CSV export")
     im.add_argument("file")
     im.set_defaults(fn=cmd_import_homemapper)
+    sub.add_parser("topology", help="show the network tree").set_defaults(fn=cmd_topology)
+    sw = sub.add_parser("add-switch", help="add an unmanaged TP-Link switch (4 or 8 ports)")
+    sw.add_argument("name")
+    sw.add_argument("--ports", type=int, choices=(4, 8), required=True)
+    sw.add_argument("--uplink", help="device it plugs into (IP, name or uuid)")
+    sw.set_defaults(fn=cmd_add_switch)
+    lk = sub.add_parser("link", help="set a device's uplink: link CHILD PARENT [--port N]")
+    lk.add_argument("child")
+    lk.add_argument("parent")
+    lk.add_argument("--port")
+    lk.add_argument("--medium", choices=("wired", "wifi"), default="wired")
+    lk.set_defaults(fn=cmd_link)
+    ul = sub.add_parser("unlink", help="remove a device's uplink")
+    ul.add_argument("child")
+    ul.set_defaults(fn=cmd_unlink)
+    sg = sub.add_parser("suggest-links", help="cautious uplink hints (never applied silently)")
+    sg.add_argument("--apply", action="store_true")
+    sg.set_defaults(fn=cmd_suggest_links)
+    rc = sub.add_parser("import-router-clients", help="read wired/Wi-Fi from a router client list")
+    rc.add_argument("file")
+    rc.set_defaults(fn=cmd_import_router_clients)
     u = sub.add_parser("update-oui", help="download the full IEEE vendor list")
     u.add_argument("--yes", action="store_true")
     u.set_defaults(fn=cmd_update_oui)

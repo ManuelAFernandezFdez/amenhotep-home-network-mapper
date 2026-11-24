@@ -80,6 +80,17 @@ class MatterNodeRow:
 
 
 @dataclass
+class LinkRow:
+    child_uuid: str
+    parent_uuid: str
+    port: str | None
+    medium: str
+    rssi: int | None
+    source: str
+    confirmed: bool
+
+
+@dataclass
 class ImportRow:
     id: int
     filename: str
@@ -500,6 +511,102 @@ class Repository:
             for r in rows
         ]
 
+    # ---- topology ---------------------------------------------------------------
+    def device_ports(self, device_uuid: str) -> int | None:
+        row = self.conn.execute("SELECT ports FROM device WHERE uuid=?", (device_uuid,)).fetchone()
+        return row["ports"] if row else None
+
+    def set_infrastructure(
+        self, device_uuid: str, flag: bool = True, ports: int | None = None
+    ) -> None:
+        if ports is not None and not 1 <= ports <= 64:
+            raise ValueError("ports must be 1-64")
+        self.conn.execute(
+            "UPDATE device SET is_infrastructure=?, ports=COALESCE(?, ports) WHERE uuid=?",
+            (int(flag), ports, device_uuid),
+        )
+
+    def add_infrastructure(
+        self, name: str, device_type: str, ports: int | None, vendor: str | None = None,
+        model: str | None = None,
+    ) -> str:  # fmt: skip
+        uid = self.create_device(utcnow())
+        fields = {"display_name": name, "device_type": device_type}
+        if vendor:
+            fields["vendor"] = vendor
+        if model:
+            fields["model"] = model
+        self.set_fields(uid, fields, user=True)
+        self.set_infrastructure(uid, True, ports)
+        return uid
+
+    def list_links(self) -> list[LinkRow]:
+        rows = self.conn.execute("SELECT * FROM link").fetchall()
+        return [
+            LinkRow(
+                r["child_uuid"], r["parent_uuid"], r["port_label"], r["medium"], r["rssi"],
+                r["source"], bool(r["confirmed"]),
+            )
+            for r in rows
+        ]  # fmt: skip
+
+    def remove_link(self, child_uuid: str) -> None:
+        self.conn.execute("DELETE FROM link WHERE child_uuid=?", (child_uuid,))
+
+    def set_link(
+        self,
+        child: str,
+        parent: str,
+        *,
+        port: str | None = None,
+        medium: str = "wired",
+        rssi: int | None = None,
+        source: str = "manual",
+        confirmed: bool = True,
+    ) -> None:
+        """One uplink per device. Refuses loops and a port that is out of range or taken."""
+        if child == parent:
+            raise ValueError("a device cannot be its own uplink")
+        if medium not in ("wired", "wifi"):
+            raise ValueError(f"bad medium {medium!r}")
+        for uid in (child, parent):
+            if not self.conn.execute("SELECT 1 FROM device WHERE uuid=?", (uid,)).fetchone():
+                raise ValueError(f"unknown device {uid}")
+        up: str | None = parent  # walk up from the new parent: meeting the child = a loop
+        for _ in range(100):
+            if up is None:
+                break
+            if up == child:
+                raise ValueError("that would create a loop in the topology")
+            row = self.conn.execute(
+                "SELECT parent_uuid FROM link WHERE child_uuid=?", (up,)
+            ).fetchone()
+            up = row["parent_uuid"] if row else None
+        port = (port or "").strip()[:32] or None
+        ports = self.device_ports(parent)
+        if port and ports and medium == "wired":
+            if not port.isdigit() or not 1 <= int(port) <= ports:
+                raise ValueError(f"port must be 1-{ports} on that device")
+            taken = self.conn.execute(
+                "SELECT child_uuid FROM link WHERE parent_uuid=? AND port_label=? "
+                "AND child_uuid<>?",
+                (parent, port, child),
+            ).fetchone()
+            if taken:
+                raise ValueError(f"port {port} is already used")
+        self.conn.execute(
+            "INSERT INTO link(child_uuid, parent_uuid, port_label, medium, rssi, source, "
+            "confirmed, last_seen) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(child_uuid) DO UPDATE SET "
+            "parent_uuid=excluded.parent_uuid, port_label=excluded.port_label, "
+            "medium=excluded.medium, rssi=excluded.rssi, source=excluded.source, "
+            "confirmed=excluded.confirmed, last_seen=excluded.last_seen",
+            (child, parent, port, medium, rssi, source, int(confirmed), _iso()),
+        )
+
+    def set_medium_by_mac(self, mac: str, medium: str) -> bool:
+        cur = self.conn.execute("UPDATE interface SET medium=? WHERE mac=?", (medium, mac))
+        return cur.rowcount > 0
+
     # ---- imports (HomeMapper CSV) -------------------------------------------
     def device_by_serial(self, serial: str) -> str | None:
         row = self.conn.execute("SELECT uuid FROM device WHERE serial=?", (serial,)).fetchone()
@@ -687,14 +794,18 @@ class Repository:
         ).fetchall()
 
     def device_by_ip_or_name(self, key: str) -> str | None:
-        return self.device_by_ip(key) or (
-            (
-                r := self.conn.execute(
-                    "SELECT device_uuid FROM interface WHERE hostname=? LIMIT 1", (key,)
-                ).fetchone()
-            )
-            and r["device_uuid"]
-        )
+        """Find a device by IP, hostname, uuid or (unique, case-insensitive) display name."""
+        if uid := self.device_by_ip(key):
+            return uid
+        row = self.conn.execute(
+            "SELECT device_uuid FROM interface WHERE hostname=? LIMIT 1", (key,)
+        ).fetchone()
+        if row:
+            return str(row["device_uuid"])
+        rows = self.conn.execute(
+            "SELECT uuid FROM device WHERE uuid=? OR lower(display_name)=lower(?)", (key, key)
+        ).fetchall()
+        return str(rows[0]["uuid"]) if len(rows) == 1 else None
 
     def clear_evidence_source(self, device_uuid: str, source: str) -> None:
         self.conn.execute(
