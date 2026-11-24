@@ -9,6 +9,7 @@ from typing import Any
 from PySide6.QtCore import QObject, QThread, Signal, Slot
 from PySide6.QtWidgets import (
     QComboBox,
+    QFileDialog,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -22,6 +23,8 @@ from PySide6.QtWidgets import (
 
 from amenhotep.core.models import PROFILES
 from amenhotep.core.netutil import TargetError, local_networks, validate_target
+from amenhotep.core.paths import data_dir
+from amenhotep.services.homemapper import ImportResult, import_homemapper
 from amenhotep.services.scan import ScanResult, ScanService
 from amenhotep.store import db
 from amenhotep.store.repo import Repository
@@ -74,6 +77,7 @@ class ScanWorker(QObject):
 
 class ScanTab(QWidget):
     scanFinished = Signal(object)  # ScanResult
+    importFinished = Signal(object)  # ImportResult
 
     def __init__(
         self,
@@ -108,6 +112,18 @@ class ScanTab(QWidget):
         self.history.setHorizontalHeaderLabels(["#", "Started", "Profile", "Target", "Status"])
         self.history.horizontalHeader().setStretchLastSection(True)
         self.history.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.import_btn = QPushButton("Import HomeMapper CSV…")
+        self.import_btn.setToolTip(
+            "Merge an export of the HomeMapper iPhone app (Home app names, rooms, serials, "
+            "firmware, Thread details) into Devices and Thread/Matter"
+        )
+        self.import_btn.clicked.connect(self.choose_import)
+        self.imports = QTableWidget(0, 7)
+        self.imports.setHorizontalHeaderLabels(
+            ["File", "Imported", "Rows", "Merged", "New", "Thread/Matter", "Conflicts"]
+        )
+        self.imports.horizontalHeader().setStretchLastSection(True)
+        self.imports.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
 
         self.start_btn.clicked.connect(self.start)
         self.cancel_btn.clicked.connect(self.cancel)
@@ -125,6 +141,12 @@ class ScanTab(QWidget):
         layout.addWidget(self.log, 1)
         layout.addWidget(QLabel("History"))
         layout.addWidget(self.history, 1)
+        imp_row = QHBoxLayout()
+        imp_row.addWidget(QLabel("Imports"))
+        imp_row.addStretch(1)
+        imp_row.addWidget(self.import_btn)
+        layout.addLayout(imp_row)
+        layout.addWidget(self.imports, 1)
         self.refresh_history()
 
     # ---- actions -----------------------------------------------------
@@ -210,7 +232,40 @@ class ScanTab(QWidget):
     def is_running(self) -> bool:
         return self._thread is not None
 
+    def choose_import(self) -> None:
+        start = str(data_dir())
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Import HomeMapper CSV", start, "CSV files (*.csv);;All files (*)"
+        )
+        if path:
+            self.import_file(path)
+
+    def import_file(self, path: str) -> ImportResult | None:
+        try:
+            result = import_homemapper(self.repo, path)
+        except (ValueError, OSError) as exc:
+            self.status.setText(f"Import failed: {exc}")
+            self.log.appendPlainText(f"error: {exc}")
+            return None
+        self.log.appendPlainText(f"imported {result.filename}")
+        for m in result.messages:
+            self.log.appendPlainText(f"  {m}")
+        self.status.setText(
+            f"Imported {result.filename}: {result.matched} merged, {result.created} new, "
+            f"{result.thread} Thread/Matter, {result.conflicts} conflict(s)"
+        )
+        self.refresh_history()
+        self.importFinished.emit(result)
+        return result
+
     def refresh_history(self) -> None:
+        imports = self.repo.list_imports()
+        self.imports.setRowCount(len(imports))
+        for r, i in enumerate(imports):
+            vals = (i.filename, i.imported_at, i.rows, i.matched, i.created, i.thread, i.conflicts)
+            for c, v in enumerate(vals):
+                self.imports.setItem(r, c, QTableWidgetItem(str(v)))
+            self.imports.item(r, 0).setToolTip("\n".join(i.detail))  # type: ignore[union-attr]
         scans = self.repo.list_scans()
         self.history.setRowCount(len(scans))
         for r, s in enumerate(scans):

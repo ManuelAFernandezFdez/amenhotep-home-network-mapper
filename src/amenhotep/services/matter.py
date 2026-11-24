@@ -38,6 +38,14 @@ class MatterDevice:
         return next((n.area for n in self.nodes if n.area), None)
 
     @property
+    def notes(self) -> str:
+        return next((n.notes for n in self.nodes if n.notes), "") or ""
+
+    @property
+    def notes_text(self) -> str:
+        return self.notes.replace("\n", " · ")
+
+    @property
     def likely_thread(self) -> bool:
         """IPv6-only and not a known LAN host: almost always a Thread device behind a router."""
         return self.host_uuid is None and not any("." in a for a in self.addresses)

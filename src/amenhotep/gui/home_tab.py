@@ -51,10 +51,12 @@ class HomeTab(QWidget):
         self.summary = QLabel()
         self.summary.setTextFormat(Qt.TextFormat.PlainText)
         self.hap = _table(["Name", "IP", "Category", "Model", "Paired", "Area", "Last seen"])
-        self.matter = _table(["Name", "Transport", "Fabrics", "Address", "Area", "Last seen"])
+        self.matter = _table(
+            ["Name", "Transport", "Fabrics", "Address", "Area", "Last seen", "Notes"]
+        )
         self.matter.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.matter.customContextMenuRequested.connect(self._matter_menu)
-        self.routers = _table(["Border router", "IP", "Thread network", "Vendor", "Model"])
+        self.routers = _table(["Border router", "IP", "Thread network", "Vendor", "Model", "Notes"])
 
         layout = QVBoxLayout(self)
         layout.addWidget(self.summary)
@@ -100,6 +102,7 @@ class HomeTab(QWidget):
                     ),
                     g.area or "",
                     max(n.last_seen for n in g.nodes),
+                    g.notes_text,
                 ]
                 for g in self._matter
             ],
@@ -108,7 +111,14 @@ class HomeTab(QWidget):
         _fill(
             self.routers,
             [
-                [b.name, b.ip or "", b.network_name or "", b.vendor or "", b.model or ""]
+                [
+                    b.name,
+                    b.ip or "",
+                    b.network_name or "",
+                    b.vendor or "",
+                    b.model or "",
+                    (b.notes or "").replace("\n", " · "),
+                ]
                 for b in brs
             ],
         )
@@ -133,6 +143,7 @@ class HomeTab(QWidget):
         dev = self._matter[item.row()]
         menu = QMenu(self)
         menu.addAction("Name…", partial(self._ask_name, dev))
+        menu.addAction("Edit notes…", partial(self._ask_notes, dev))
         sub = menu.addMenu("Place in area")
         sub.addAction("(unassigned)", partial(self.place_matter, dev, None))
         for a in self.repo.list_areas():
@@ -143,6 +154,17 @@ class HomeTab(QWidget):
         text, ok = QInputDialog.getText(self, "Name Matter device", "Name:", text=dev.label or "")
         if ok:
             self.name_matter(dev, text)
+
+    def _ask_notes(self, dev: MatterDevice) -> None:
+        text, ok = QInputDialog.getMultiLineText(self, "Matter device notes", "Notes:", dev.notes)
+        if ok:
+            self.set_matter_notes(dev, text)
+
+    def set_matter_notes(self, dev: MatterDevice, notes: str) -> None:
+        for n in dev.nodes:
+            self.repo.set_matter_notes(n.instance, notes.strip() or None)
+        self.repo.commit()
+        self.refresh()
 
     def name_matter(self, dev: MatterDevice, label: str) -> None:
         for n in dev.nodes:

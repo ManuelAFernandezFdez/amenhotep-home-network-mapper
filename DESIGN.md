@@ -399,3 +399,16 @@ Migration `002_matter_thread.sql` adds `matter_node` (one row per `_matter._tcp`
 ## Presence addendum
 
 Migration `003_presence.sql` adds `sighting(device_uuid, scan_id, ts)` (one row per device per finished scan that saw it) and `device.last_probed` (last full fingerprint). `ScanService.watch` runs: quick sweep → neighbour table → mDNS → unicast mDNS reverse → resolve + sightings → targeted `standard` fingerprint of `devices_needing_probe` (never probed, or unidentified and older than 6 h; max 8). Presence statistics (`services/presence.py`) divide a device's sightings by the checks that logged sightings, per local hour; an hour counts as "typically online" with at least 3 checks and a seen ratio of 50 % or more. `prune(90)` deletes older scans (cascading to observations and sightings) but always keeps the latest finished scan.
+
+## M5 addendum: HomeMapper CSV import
+
+`amenhotep import-homemapper FILE` (or Scans tab → *Import HomeMapper CSV…*) merges an export of
+the HomeMapper iPhone app. Rows match a device by serial, MAC, IPv4, name, then a unique model;
+a row whose IPv6 address equals a Matter node's enriches that node (label, room, Thread details).
+Fields without a column (firmware, battery, signal, Thread role/channel/stability, last online…)
+go into a marked `[HomeMapper import: <file>]` block of the Notes of the device, Matter node or
+border router; re-importing replaces the block. Identity from the Home app is evidence
+(source `homemapper`, 0.9); user locks win, names and areas already set are kept, and a row that
+contradicts the stored vendor *and* model only adds a warning note. Each import is recorded in
+`import_log` (migration 004) and listed on the Scans tab. Unknown Home rooms are added as areas
+without a floor.

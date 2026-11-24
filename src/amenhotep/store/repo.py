@@ -76,6 +76,20 @@ class MatterNodeRow:
     area: str | None
     last_seen: str
     area_id: int | None = None
+    notes: str | None = None
+
+
+@dataclass
+class ImportRow:
+    id: int
+    filename: str
+    imported_at: str
+    rows: int
+    matched: int
+    created: int
+    thread: int
+    conflicts: int
+    detail: list[str]
 
 
 @dataclass
@@ -87,6 +101,7 @@ class BorderRouterRow:
     vendor: str | None
     model: str | None
     last_seen: str
+    notes: str | None = None
 
 
 @dataclass
@@ -432,9 +447,18 @@ class Repository:
                 r["area_name"],
                 r["last_seen"],
                 r["area_id"],
+                r["notes"],
             )
             for r in rows
         ]
+
+    def set_matter_notes(self, instance: str, notes: str | None) -> None:
+        self.conn.execute("UPDATE matter_node SET notes=? WHERE instance=?", (notes, instance))
+
+    def set_border_router_notes(self, device_uuid: str, notes: str | None) -> None:
+        self.conn.execute(
+            "UPDATE thread_border_router SET notes=? WHERE device_uuid=?", (notes, device_uuid)
+        )
 
     def upsert_border_router(
         self,
@@ -471,6 +495,61 @@ class Repository:
                 r["vendor"],
                 r["model"],
                 r["last_seen"],
+                r["notes"],
+            )
+            for r in rows
+        ]
+
+    # ---- imports (HomeMapper CSV) -------------------------------------------
+    def device_by_serial(self, serial: str) -> str | None:
+        row = self.conn.execute("SELECT uuid FROM device WHERE serial=?", (serial,)).fetchone()
+        return row["uuid"] if row else None
+
+    def set_serial(self, device_uuid: str, serial: str | None) -> None:
+        self.conn.execute("UPDATE device SET serial=? WHERE uuid=?", (serial, device_uuid))
+
+    def add_import_log(
+        self,
+        filename: str,
+        rows: int,
+        matched: int,
+        created: int,
+        thread: int,
+        conflicts: int,
+        detail: list[str],
+    ) -> int:
+        cur = self.conn.execute(
+            "INSERT INTO import_log(filename, source, imported_at, rows, matched, created, thread,"
+            " conflicts, detail) VALUES (?,?,?,?,?,?,?,?,?)",
+            (
+                filename,
+                "homemapper",
+                _iso(),
+                rows,
+                matched,
+                created,
+                thread,
+                conflicts,
+                json.dumps(detail),
+            ),
+        )
+        return int(cur.lastrowid or 0)
+
+    def list_imports(self, limit: int = 50) -> list[ImportRow]:
+        rows = self.conn.execute(
+            "SELECT * FROM import_log ORDER BY id DESC LIMIT ?", (limit,)
+        ).fetchall()
+        return [
+            ImportRow(
+                r["id"],
+                r["filename"],
+                r["imported_at"],
+                r["rows"],
+                r["matched"],
+                r["created"],
+                r["thread"],
+                r["conflicts"],
+                json.loads(r["detail"]),
             )
             for r in rows
         ]

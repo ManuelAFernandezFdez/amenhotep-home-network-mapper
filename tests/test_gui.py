@@ -274,3 +274,13 @@ def test_packaged_logo_matches_assets():
         assert (root / "assets" / src).read_text() == (
             root / "src/amenhotep/data" / packaged
         ).read_text()
+
+
+def test_scan_tab_imports_a_file_and_lists_it(window, tmp_path):
+    from tests.test_homemapper import ROWS, write
+
+    path = write(tmp_path / "HomeMapper Devices-9.csv", ROWS)
+    result = window.scans.import_file(str(path))
+    assert result is not None and result.rows == 3
+    assert window.scans.imports.item(0, 0).text() == "HomeMapper Devices-9.csv"
+    assert window.scans.imports.item(0, 2).text() == "3"

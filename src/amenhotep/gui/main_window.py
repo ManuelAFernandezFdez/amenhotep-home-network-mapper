@@ -37,6 +37,7 @@ class MainWindow(QMainWindow):
         self.home = HomeTab(self.repo)
         self.scans = ScanTab(db_path, self.repo, factory)
         self.scans.scanFinished.connect(self._on_scan_finished)
+        self.scans.importFinished.connect(self._on_import_finished)
         self.devices.refreshed.connect(self._update_status)
 
         self.tabs = QTabWidget()
@@ -61,6 +62,11 @@ class MainWindow(QMainWindow):
         self._update_status()
 
     def _on_scan_finished(self, _result: ScanResult) -> None:
+        self.devices.refresh()
+        self.home.refresh()
+        self._update_status()
+
+    def _on_import_finished(self, _result: object) -> None:
         self.devices.refresh()
         self.home.refresh()
         self._update_status()

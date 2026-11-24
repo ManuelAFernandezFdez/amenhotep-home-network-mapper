@@ -218,6 +218,31 @@ def cmd_reclassify(_args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_import_homemapper(args: argparse.Namespace) -> int:
+    from amenhotep.services.homemapper import import_homemapper
+
+    path = Path(args.file).expanduser()
+    if not path.is_file():
+        print(f"error: {path} is not a file", file=sys.stderr)
+        return 2
+    repo = Repository(db.connect(db_path()))
+    try:
+        r = import_homemapper(repo, path)
+    except (ValueError, OSError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    print(
+        f"{r.filename}: {r.rows} rows: {r.matched} merged into devices, {r.created} new, "
+        f"{r.thread} Thread/Matter, {r.conflicts} conflicts"
+    )
+    for room in r.rooms_created:
+        print(f"  new room: {room}")
+    for m in r.messages:
+        print(f"  {m}")
+    print(satisfaction(repo.list_devices()).message())
+    return 0
+
+
 def cmd_update_oui(args: argparse.Namespace) -> int:
     if not args.yes:
         print(
@@ -265,6 +290,9 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser(
         "reclassify", help="re-run identification on the last scan's data (no network traffic)"
     ).set_defaults(fn=cmd_reclassify)
+    im = sub.add_parser("import-homemapper", help="merge a HomeMapper (iPhone) CSV export")
+    im.add_argument("file")
+    im.set_defaults(fn=cmd_import_homemapper)
     u = sub.add_parser("update-oui", help="download the full IEEE vendor list")
     u.add_argument("--yes", action="store_true")
     u.set_defaults(fn=cmd_update_oui)
